@@ -1,0 +1,121 @@
+﻿@model DashboardViewModel
+@{
+    ViewData["Title"] = "ABC Retail Dashboard";
+}
+
+<div class="container">
+    <h1 class="display-4 mb-4">ABC Retail Dashboard</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">@Model.TotalCustomers</h5>
+                    <p class="card-text">Total Customers</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">@Model.TotalProducts</h5>
+                    <p class="card-text">Products</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">@Model.PendingOrders</h5>
+                    <p class="card-text">Pending Orders</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">@Model.CompletedOrders</h5>
+                    <p class="card-text">Completed Orders</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3>Quick Actions</h3>
+            <div class="btn-group" role="group">
+                <a asp-controller="Customers" asp-action="Create" class="btn btn-outline-primary">
+                    <i class="fas fa-user-plus"></i> Add Customer
+                </a>
+                <a asp-controller="Products" asp-action="Create" class="btn btn-outline-success">
+                    <i class="fas fa-box"></i> Add Product
+                </a>
+                <a asp-controller="Orders" asp-action="Create" class="btn btn-outline-warning">
+                    <i class="fas fa-shopping-cart"></i> Create Order
+                </a>
+                <a asp-controller="Contracts" asp-action="Upload" class="btn btn-outline-info">
+                    <i class="fas fa-file-contract"></i> Upload Contract
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Orders</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Order tracking will appear here</p>
+                    <a asp-controller="Orders" asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                        View All Orders
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>System Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Azure Storage: Connected
+                    </div>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Queue Service: Active
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .card {
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .btn-group .btn {
+            margin-right: 5px;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, index) => {
+                card.style.animationDelay = `${index * 0.1}s`;
+                card.classList.add('animate__animated', 'animate__fadeInUp');
+            });
+        });
+    </script>
+}

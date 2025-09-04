@@ -1,0 +1,44 @@
+﻿@model List<Customer>
+@{
+    ViewData["Title"] = "Customers";
+}
+
+<div class="container">
+    <h2>Customers</h2>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+
+    <p>
+        <a asp-action="Create" class="btn btn-primary">Create New Customer</a>
+    </p>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Customer ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var customer in Model)
+            {
+                <tr>
+                    <td>@customer.RowKey</td>
+                    <td>@customer.Name</td>
+                    <td>@customer.Email</td>
+                    <td>@customer.Phone</td>
+                    <td>
+                        <a asp-action="Edit" asp-route-id="@customer.RowKey" class="btn btn-sm btn-warning">Edit</a>
+                        <a asp-action="Delete" asp-route-id="@customer.RowKey" class="btn btn-sm btn-danger">Delete</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

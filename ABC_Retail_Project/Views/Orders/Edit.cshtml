@@ -1,0 +1,79 @@
+﻿@model Order
+@{
+    ViewData["Title"] = "Edit Order";
+    var customers = ViewBag.Customers as List<Customer>;
+    var products = ViewBag.Products as List<Product>;
+}
+
+<h2>Edit Order</h2>
+
+<form asp-action="Edit" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="PartitionKey" />
+    <input type="hidden" asp-for="RowKey" />
+    <input type="hidden" asp-for="Timestamp" />
+
+    <div class="form-group">
+        <label asp-for="CustomerId" class="control-label">Customer</label>
+        <select asp-for="CustomerId" class="form-control">
+            <option value="">Select Customer</option>
+            @foreach (var customer in customers)
+            {
+                <option value="@customer.RowKey" selected="@(customer.RowKey == Model.CustomerId)">@customer.Name (@customer.Email)</option>
+            }
+        </select>
+        <span asp-validation-for="CustomerId" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="ProductId" class="control-label">Product</label>
+        <select asp-for="ProductId" class="form-control">
+            <option value="">Select Product</option>
+            @foreach (var product in products)
+            {
+                <option value="@product.RowKey" selected="@(product.RowKey == Model.ProductId)">@product.Name - R @product.Price.ToString("N2")</option>
+            }
+        </select>
+        <span asp-validation-for="ProductId" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="Quantity" class="control-label">Quantity</label>
+        <input asp-for="Quantity" class="form-control" type="number" min="1" />
+        <span asp-validation-for="Quantity" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="TotalAmount" class="control-label">Total Amount (R)</label>
+        <input asp-for="TotalAmount" class="form-control" type="number" step="0.01" />
+        <span asp-validation-for="TotalAmount" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="OrderDate" class="control-label">Order Date</label>
+        <input asp-for="OrderDate" class="form-control" type="date" />
+        <span asp-validation-for="OrderDate" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="Status" class="control-label">Status</label>
+        <select asp-for="Status" class="form-control">
+            <option value="Pending">Pending</option>
+            <option value="Processing">Processing</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+        </select>
+        <span asp-validation-for="Status" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
