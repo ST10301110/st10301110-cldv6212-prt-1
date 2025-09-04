@@ -33,7 +33,6 @@ namespace ABC_Retail_Project.Controllers
             if (order == null)
                 return NotFound();
 
-            // Load customer and product details for display
             var customers = await _customerService.GetCustomersAsync();
             var products = await _productService.GetProductsAsync();
             order.Customer = customers.FirstOrDefault(c => c.RowKey == order.CustomerId);
