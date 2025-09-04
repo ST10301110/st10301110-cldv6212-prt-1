@@ -25,26 +25,22 @@ namespace ABC_Retail_Project.Models
         [Display(Name = "Total Amount")]
         public decimal TotalAmount { get; set; }
 
-        [Required(ErrorMessage = "Order date is required")]
         [Display(Name = "Order Date")]
         public DateTime OrderDate { get; set; }
 
         public string Status { get; set; }
 
-        // These should not have validation attributes
         public string PartitionKey { get; set; }
         public string RowKey { get; set; }
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
-        // Add these for display purposes only (not stored in database)
         [IgnoreDataMember]
         public Customer Customer { get; set; }
 
         [IgnoreDataMember]
         public Product Product { get; set; }
 
-        // Display properties
         [Display(Name = "Customer Name")]
         public string CustomerName => Customer?.Name;
 

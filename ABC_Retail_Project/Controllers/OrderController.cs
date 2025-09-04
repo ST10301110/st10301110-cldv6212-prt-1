@@ -56,6 +56,9 @@ namespace ABC_Retail_Project.Controllers
         public async Task<IActionResult> Create(Order order)
         {
 
+            ModelState.Remove("OrderDate");
+            ModelState.Remove("Status");
+
             if (ModelState.IsValid)
             {
                 try

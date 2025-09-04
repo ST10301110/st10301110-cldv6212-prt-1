@@ -153,20 +153,17 @@ namespace ABC_Retail_Project.Models
 
             try
             {
-                // Generate unique blob name
                 var blobName = $"{productId}-{Guid.NewGuid()}{Path.GetExtension(imageFile.FileName)}";
                 Console.WriteLine($"Blob name: {blobName}");
 
                 var blobClient = _containerClient.GetBlobClient(blobName);
                 Console.WriteLine($"Blob client created for: {blobClient.Uri}");
 
-                // Upload the file
                 using var stream = imageFile.OpenReadStream();
                 var response = await blobClient.UploadAsync(stream, overwrite: true);
 
                 Console.WriteLine($"Upload successful! Status: {response.GetRawResponse().Status}");
 
-                // Return the URL
                 var imageUrl = blobClient.Uri.ToString();
                 Console.WriteLine($"Image URL: {imageUrl}");
 
