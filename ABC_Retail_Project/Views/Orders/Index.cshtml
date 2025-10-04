@@ -9,6 +9,34 @@
     <a asp-action="Create" class="btn btn-primary">Create New Order</a>
 </p>
 
+<!-- Status Filter -->
+<div class="form-group">
+    <form asp-action="Index" method="get" class="form-inline">
+        <label for="statusFilter" class="mr-2">Filter by Status:</label>
+        <select name="statusFilter" class="form-control mr-2" onchange="this.form.submit()" style="width: auto;">
+            <option value="All" selected="@(ViewBag.StatusFilter == "All")">All Statuses</option>
+            @foreach (var status in Order.GetAllStatuses())
+            {
+                <option value="@status" selected="@(ViewBag.StatusFilter == status)">@status</option>
+            }
+        </select>
+    </form>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["SuccessMessage"]
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["ErrorMessage"]
+    </div>
+}
+
 <table class="table">
     <thead>
         <tr>
@@ -32,7 +60,9 @@
                 <td>@item.Quantity</td>
                 <td>@item.FormattedTotalAmount</td>
                 <td>@item.FormattedOrderDate</td>
-                <td>@item.Status</td>
+                <td>
+                    <span class="@item.GetStatusBadgeClass()">@item.Status</span>
+                </td>
                 <td>
                     <a asp-action="Details" asp-route-id="@item.RowKey" class="btn btn-info btn-sm">Details</a>
                     <a asp-action="Edit" asp-route-id="@item.RowKey" class="btn btn-warning btn-sm">Edit</a>

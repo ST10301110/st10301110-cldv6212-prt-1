@@ -18,6 +18,15 @@ catch (Exception ex)
 
 builder.Services.AddControllersWithViews();
 
+// ADD HTTP CLIENT FOR FUNCTIONS
+builder.Services.AddHttpClient("RetailFunctions", client =>
+{
+    // This will be your Functions URL when deployed
+    // For local development, use: http://localhost:7071
+    client.BaseAddress = new Uri("http://localhost:7071");
+    client.DefaultRequestHeaders.Add("x-functions-key", "your-function-key-here"); // Optional for local
+});
+
 try
 {
     var connectionString = builder.Configuration.GetConnectionString("AzureStorage") ??

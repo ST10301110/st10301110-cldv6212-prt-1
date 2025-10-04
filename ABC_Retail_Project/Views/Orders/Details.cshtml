@@ -5,34 +5,77 @@
 
 <h2>Order Details</h2>
 
-<div>
-    <h4>Order Information</h4>
-    <hr />
-    <dl class="row">
-        <dt class="col-sm-2">Order ID</dt>
-        <dd class="col-sm-10">@Model.RowKey</dd>
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["SuccessMessage"]
+    </div>
+}
 
-        <dt class="col-sm-2">Customer</dt>
-        <dd class="col-sm-10">@Model.CustomerName</dd>
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["ErrorMessage"]
+    </div>
+}
 
-        <dt class="col-sm-2">Product</dt>
-        <dd class="col-sm-10">@Model.ProductName</dd>
+<div class="row">
+    <div class="col-md-6">
+        <h4>Order Information</h4>
+        <hr />
+        <dl class="row">
+            <dt class="col-sm-4">Order ID</dt>
+            <dd class="col-sm-8">@Model.RowKey</dd>
 
-        <dt class="col-sm-2">Quantity</dt>
-        <dd class="col-sm-10">@Model.Quantity</dd>
+            <dt class="col-sm-4">Customer</dt>
+            <dd class="col-sm-8">@Model.CustomerName</dd>
 
-        <dt class="col-sm-2">Total Amount</dt>
-        <dd class="col-sm-10">@Model.FormattedTotalAmount</dd>
+            <dt class="col-sm-4">Product</dt>
+            <dd class="col-sm-8">@Model.ProductName</dd>
 
-        <dt class="col-sm-2">Order Date</dt>
-        <dd class="col-sm-10">@Model.FormattedOrderDate</dd>
+            <dt class="col-sm-4">Quantity</dt>
+            <dd class="col-sm-8">@Model.Quantity</dd>
 
-        <dt class="col-sm-2">Status</dt>
-        <dd class="col-sm-10">@Model.Status</dd>
-    </dl>
+            <dt class="col-sm-4">Total Amount</dt>
+            <dd class="col-sm-8">@Model.FormattedTotalAmount</dd>
+
+            <dt class="col-sm-4">Order Date</dt>
+            <dd class="col-sm-8">@Model.FormattedOrderDate</dd>
+
+            <dt class="col-sm-4">Status</dt>
+            <dd class="col-sm-8">
+                <span class="@Model.GetStatusBadgeClass()">@Model.Status</span>
+            </dd>
+        </dl>
+    </div>
+
+    <div class="col-md-6">
+        <h4>Update Status</h4>
+        <hr />
+        <form asp-action="UpdateStatus" method="post">
+            <input type="hidden" name="id" value="@Model.RowKey" />
+            <div class="form-group">
+                <label for="newStatus">New Status:</label>
+                <select name="newStatus" class="form-control" required>
+                    <option value="">Select New Status</option>
+                    @foreach (var status in Order.GetAllStatuses())
+                    {
+                        if (Model.CanUpdateStatus(status))
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    }
+                </select>
+                <small class="form-text text-muted">
+                    Current status: <strong>@Model.Status</strong>
+                </small>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Status</button>
+        </form>
+    </div>
 </div>
 
-<div>
-    <a asp-action="Edit" asp-route-id="@Model.RowKey" class="btn btn-primary">Edit</a>
+<div class="mt-3">
+    <a asp-action="Edit" asp-route-id="@Model.RowKey" class="btn btn-warning">Edit Order</a>
     <a asp-action="Index" class="btn btn-secondary">Back to List</a>
 </div>

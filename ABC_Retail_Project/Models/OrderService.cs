@@ -37,28 +37,41 @@ namespace ABC_Retail_Project.Models
 
             try
             {
-                // Add to table storage with ALL fields
-                var entity = new TableEntity(order.PartitionKey, order.RowKey)
+
+                var queueMessage = new OrderQueueMessage
                 {
-                    ["CustomerId"] = order.CustomerId,
-                    ["ProductId"] = order.ProductId,
-                    ["Quantity"] = order.Quantity,
-                    ["TotalAmount"] = (double)order.TotalAmount, // Convert to double for storage
-                    ["OrderDate"] = order.OrderDate,
-                    ["Status"] = order.Status
+                    PartitionKey = order.PartitionKey,
+                    RowKey = order.RowKey,
+                    CustomerId = order.CustomerId,
+                    ProductId = order.ProductId,
+                    Quantity = order.Quantity,
+                    TotalAmount = (double)order.TotalAmount,
+                    OrderDate = order.OrderDate,
+                    Status = order.Status
                 };
 
-                await _tableClient.AddEntityAsync(entity);
-                Console.WriteLine("Order successfully added to table with all fields!");
+                var messageJson = System.Text.Json.JsonSerializer.Serialize(queueMessage);
+                await _queueClient.SendMessageAsync(messageJson);
 
-                // Add to queue (if you have queue functionality)
-                // await _queueClient.SendMessageAsync(order.RowKey);
+                Console.WriteLine("Order successfully added to queue! Function will process it.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"ORDER QUEUE ERROR: {ex.Message}");
                 throw;
             }
+        }
+
+        public class OrderQueueMessage
+        {
+            public string PartitionKey { get; set; }
+            public string RowKey { get; set; }
+            public string CustomerId { get; set; }
+            public string ProductId { get; set; }
+            public int Quantity { get; set; }
+            public double TotalAmount { get; set; }
+            public DateTime OrderDate { get; set; }
+            public string Status { get; set; }
         }
 
         private decimal GetTotalAmountFromEntity(TableEntity entity)
@@ -205,6 +218,34 @@ namespace ABC_Retail_Project.Models
         public async Task DeleteOrderAsync(string partitionKey, string rowKey)
         {
             await _tableClient.DeleteEntityAsync(partitionKey, rowKey);
+        }
+
+        public async Task UpdateOrderStatusAsync(string orderId, string newStatus)
+        {
+            try
+            {
+                var order = await GetOrderAsync("Order", orderId);
+                if (order != null && order.CanUpdateStatus(newStatus))
+                {
+                    order.Status = newStatus;
+                    await UpdateOrderAsync(order);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Invalid status transition from {order?.Status} to {newStatus}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating order status: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task<List<Order>> GetOrdersByStatusAsync(string status)
+        {
+            var orders = await GetOrdersWithDetailsAsync();
+            return orders.Where(o => o.Status == status).ToList();
         }
     }
 }

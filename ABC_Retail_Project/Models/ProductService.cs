@@ -1,6 +1,7 @@
 ﻿using Azure;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
+using System.Net.Http.Json;
 
 namespace ABC_Retail_Project.Models
 {
@@ -8,14 +9,17 @@ namespace ABC_Retail_Project.Models
     {
         private readonly TableClient _tableClient;
         private readonly BlobContainerClient _containerClient;
+        private readonly HttpClient _httpClient; // ADD HTTP CLIENT
 
-        public ProductService(TableServiceClient tableServiceClient, BlobServiceClient blobServiceClient)
+        public ProductService(TableServiceClient tableServiceClient, BlobServiceClient blobServiceClient, IHttpClientFactory httpClientFactory)
         {
             _tableClient = tableServiceClient.GetTableClient("Products");
             _tableClient.CreateIfNotExists();
 
             _containerClient = blobServiceClient.GetBlobContainerClient("product-images");
             _containerClient.CreateIfNotExists();
+
+            _httpClient = httpClientFactory.CreateClient("RetailFunctions"); // INITIALIZE HTTP CLIENT
         }
 
         public async Task AddProductAsync(Product product)
@@ -60,86 +64,52 @@ namespace ABC_Retail_Project.Models
             }
         }
 
-        public async Task<List<Product>> GetProductsAsync()
+        // NEW METHOD: Upload image using Function
+        public async Task<string> UploadImageViaFunctionAsync(IFormFile imageFile, string productId)
         {
-            var products = new List<Product>();
+            Console.WriteLine($"=== UPLOAD IMAGE VIA FUNCTION STARTED ===");
+            Console.WriteLine($"File: {imageFile.FileName}, Size: {imageFile.Length}, Type: {imageFile.ContentType}");
 
-            await foreach (var entity in _tableClient.QueryAsync<TableEntity>())
+            if (imageFile == null || imageFile.Length == 0)
             {
-                var product = new Product
-                {
-                    PartitionKey = entity.PartitionKey,
-                    RowKey = entity.RowKey,
-                    Name = entity.GetString("Name"),
-                    Description = entity.GetString("Description"),
-                    // Get price as string and convert to decimal
-                    PriceString = entity.GetString("PriceString"),
-                    StockQuantity = entity.GetInt32("StockQuantity") ?? 0,
-                    ImageUrl = entity.GetString("ImageUrl"),
-                    Timestamp = entity.Timestamp,
-                    ETag = entity.ETag
-                };
-
-                Console.WriteLine($"DEBUG - Product: {product.Name}, " +
-                                 $"Price: {product.Price}, " +
-                                 $"PriceString: {product.PriceString}");
-
-                products.Add(product);
+                Console.WriteLine("No image file provided");
+                return null;
             }
 
-            return products;
-        }
-
-        public async Task<Product> GetProductAsync(string partitionKey, string rowKey)
-        {
             try
             {
-                var response = await _tableClient.GetEntityAsync<TableEntity>(partitionKey, rowKey);
-                var entity = response.Value;
+                using var stream = new MemoryStream();
+                await imageFile.CopyToAsync(stream);
+                stream.Position = 0;
 
-                var product = new Product
+                using var content = new StreamContent(stream);
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(imageFile.ContentType);
+
+                // Call the BlobUploadFunction
+                var response = await _httpClient.PostAsync("/api/UploadBlob", content);
+
+                if (response.IsSuccessStatusCode)
                 {
-                    PartitionKey = entity.PartitionKey,
-                    RowKey = entity.RowKey,
-                    Name = entity.GetString("Name"),
-                    Description = entity.GetString("Description"),
-                    // Get price as string and convert to decimal
-                    PriceString = entity.GetString("PriceString"),
-                    StockQuantity = entity.GetInt32("StockQuantity") ?? 0,
-                    ImageUrl = entity.GetString("ImageUrl"),
-                    Timestamp = entity.Timestamp,
-                    ETag = entity.ETag
-                };
-
-                return product;
+                    var result = await response.Content.ReadFromJsonAsync<BlobUploadResponse>();
+                    Console.WriteLine($"Image uploaded via function: {result.BlobUrl}");
+                    return result.BlobUrl;
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Function upload failed: {error}");
+                    return null;
+                }
             }
-            catch (RequestFailedException ex) when (ex.Status == 404)
+            catch (Exception ex)
             {
+                Console.WriteLine($"FUNCTION UPLOAD ERROR: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
                 return null;
             }
         }
 
-        public async Task UpdateProductAsync(Product product)
-        {
-            // Create a TableEntity for update
-            var entity = new TableEntity(product.PartitionKey, product.RowKey)
-            {
-                ["Name"] = product.Name,
-                ["Description"] = product.Description,
-                ["PriceString"] = product.Price.ToString("F2"), // Store as string
-                ["StockQuantity"] = product.StockQuantity,
-                ["ImageUrl"] = product.ImageUrl,
-                ETag = product.ETag
-            };
-
-            await _tableClient.UpdateEntityAsync(entity, ETag.All, TableUpdateMode.Replace);
-        }
-
-        public async Task DeleteProductAsync(string partitionKey, string rowKey)
-        {
-            await _tableClient.DeleteEntityAsync(partitionKey, rowKey);
-        }
-
+        // Keep the original method as fallback
         public async Task<string> UploadImageAsync(IFormFile imageFile, string productId)
         {
             Console.WriteLine($"=== UPLOAD IMAGE STARTED ===");
@@ -176,5 +146,92 @@ namespace ABC_Retail_Project.Models
                 return null;
             }
         }
+
+        // Rest of your existing methods (GetProductsAsync, GetProductAsync, UpdateProductAsync, DeleteProductAsync) remain the same
+        public async Task<List<Product>> GetProductsAsync()
+        {
+            var products = new List<Product>();
+
+            await foreach (var entity in _tableClient.QueryAsync<TableEntity>())
+            {
+                var product = new Product
+                {
+                    PartitionKey = entity.PartitionKey,
+                    RowKey = entity.RowKey,
+                    Name = entity.GetString("Name"),
+                    Description = entity.GetString("Description"),
+                    PriceString = entity.GetString("PriceString"),
+                    StockQuantity = entity.GetInt32("StockQuantity") ?? 0,
+                    ImageUrl = entity.GetString("ImageUrl"),
+                    Timestamp = entity.Timestamp,
+                    ETag = entity.ETag
+                };
+
+                Console.WriteLine($"DEBUG - Product: {product.Name}, " +
+                                 $"Price: {product.Price}, " +
+                                 $"PriceString: {product.PriceString}");
+
+                products.Add(product);
+            }
+
+            return products;
+        }
+
+        public async Task<Product> GetProductAsync(string partitionKey, string rowKey)
+        {
+            try
+            {
+                var response = await _tableClient.GetEntityAsync<TableEntity>(partitionKey, rowKey);
+                var entity = response.Value;
+
+                var product = new Product
+                {
+                    PartitionKey = entity.PartitionKey,
+                    RowKey = entity.RowKey,
+                    Name = entity.GetString("Name"),
+                    Description = entity.GetString("Description"),
+                    PriceString = entity.GetString("PriceString"),
+                    StockQuantity = entity.GetInt32("StockQuantity") ?? 0,
+                    ImageUrl = entity.GetString("ImageUrl"),
+                    Timestamp = entity.Timestamp,
+                    ETag = entity.ETag
+                };
+
+                return product;
+            }
+            catch (RequestFailedException ex) when (ex.Status == 404)
+            {
+                return null;
+            }
+        }
+
+        public async Task UpdateProductAsync(Product product)
+        {
+            var entity = new TableEntity(product.PartitionKey, product.RowKey)
+            {
+                ["Name"] = product.Name,
+                ["Description"] = product.Description,
+                ["PriceString"] = product.Price.ToString("F2"),
+                ["StockQuantity"] = product.StockQuantity,
+                ["ImageUrl"] = product.ImageUrl,
+                ETag = product.ETag
+            };
+
+            await _tableClient.UpdateEntityAsync(entity, ETag.All, TableUpdateMode.Replace);
+        }
+
+        public async Task DeleteProductAsync(string partitionKey, string rowKey)
+        {
+            await _tableClient.DeleteEntityAsync(partitionKey, rowKey);
+        }
+    }
+
+    // ADD Response class for function calls
+    public class BlobUploadResponse
+    {
+        public bool Success { get; set; }
+        public string BlobUrl { get; set; }
+        public string FileName { get; set; }
+        public string Message { get; set; }
     }
 }

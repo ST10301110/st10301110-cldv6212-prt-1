@@ -17,9 +17,22 @@ namespace ABC_Retail_Project.Controllers
         }
 
         // GET: Orders
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string statusFilter)
         {
             var orders = await _orderService.GetOrdersWithDetailsAsync();
+
+            // Apply status filter if provided
+            if (!string.IsNullOrEmpty(statusFilter) && statusFilter != "All")
+            {
+                orders = orders.Where(o => o.Status == statusFilter).ToList();
+                ViewBag.StatusFilter = statusFilter;
+            }
+            else
+            {
+                ViewBag.StatusFilter = "All";
+            }
+
+            ViewBag.AllStatuses = Order.GetAllStatuses();
             return View(orders);
         }
 
@@ -33,11 +46,13 @@ namespace ABC_Retail_Project.Controllers
             if (order == null)
                 return NotFound();
 
+            // Load customer and product details for display
             var customers = await _customerService.GetCustomersAsync();
             var products = await _productService.GetProductsAsync();
             order.Customer = customers.FirstOrDefault(c => c.RowKey == order.CustomerId);
             order.Product = products.FirstOrDefault(p => p.RowKey == order.ProductId);
 
+            ViewBag.AllStatuses = Order.GetAllStatuses();
             return View(order);
         }
 
@@ -54,18 +69,23 @@ namespace ABC_Retail_Project.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Order order)
         {
-
-            ModelState.Remove("OrderDate");
-            ModelState.Remove("Status");
+            // Remove validation for fields that are set programmatically
+            ModelState.Remove("PartitionKey");
+            ModelState.Remove("RowKey");
+            ModelState.Remove("Timestamp");
+            ModelState.Remove("ETag");
+            ModelState.Remove("Customer");
+            ModelState.Remove("Product");
 
             if (ModelState.IsValid)
             {
                 try
                 {
+                    // Set values programmatically
                     order.RowKey = Guid.NewGuid().ToString();
                     order.PartitionKey = "Order";
-                    order.Status = "Pending"; 
-                    order.OrderDate = DateTime.Now; 
+                    order.OrderDate = DateTime.Now;
+                    order.Status = "Pending"; // Set default status
 
                     await _orderService.AddOrderToQueueAsync(order);
                     TempData["SuccessMessage"] = "Order created successfully!";
@@ -90,7 +110,6 @@ namespace ABC_Retail_Project.Controllers
 
             ViewBag.Customers = await _customerService.GetCustomersAsync();
             ViewBag.Products = await _productService.GetProductsAsync();
-
             return View(order);
         }
 
@@ -106,6 +125,8 @@ namespace ABC_Retail_Project.Controllers
 
             ViewBag.Customers = await _customerService.GetCustomersAsync();
             ViewBag.Products = await _productService.GetProductsAsync();
+            ViewBag.AllStatuses = Order.GetAllStatuses();
+            ViewBag.CurrentStatus = order.Status;
             return View(order);
         }
 
@@ -124,9 +145,18 @@ namespace ABC_Retail_Project.Controllers
             {
                 try
                 {
-                    await _orderService.UpdateOrderAsync(order);
-                    TempData["SuccessMessage"] = "Order updated successfully!";
-                    return RedirectToAction(nameof(Index));
+                    // Validate status transition
+                    var existingOrder = await _orderService.GetOrderAsync("Order", id);
+                    if (existingOrder != null && !existingOrder.CanUpdateStatus(order.Status))
+                    {
+                        TempData["ErrorMessage"] = $"Invalid status transition from {existingOrder.Status} to {order.Status}";
+                    }
+                    else
+                    {
+                        await _orderService.UpdateOrderAsync(order);
+                        TempData["SuccessMessage"] = "Order updated successfully!";
+                        return RedirectToAction(nameof(Index));
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -136,7 +166,50 @@ namespace ABC_Retail_Project.Controllers
 
             ViewBag.Customers = await _customerService.GetCustomersAsync();
             ViewBag.Products = await _productService.GetProductsAsync();
+            ViewBag.AllStatuses = Order.GetAllStatuses();
+            ViewBag.CurrentStatus = order.Status;
             return View(order);
+        }
+
+        // POST: Orders/UpdateStatus
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateStatus(string id, string newStatus)
+        {
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(newStatus))
+            {
+                TempData["ErrorMessage"] = "Invalid request parameters.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            try
+            {
+                var order = await _orderService.GetOrderAsync("Order", id);
+                if (order == null)
+                {
+                    TempData["ErrorMessage"] = "Order not found.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Validate status transition
+                if (!order.CanUpdateStatus(newStatus))
+                {
+                    TempData["ErrorMessage"] = $"Cannot change status from {order.Status} to {newStatus}.";
+                    return RedirectToAction(nameof(Details), new { id });
+                }
+
+                // Update status
+                order.Status = newStatus;
+                await _orderService.UpdateOrderAsync(order);
+
+                TempData["SuccessMessage"] = $"Order status updated to {newStatus} successfully!";
+                return RedirectToAction(nameof(Details), new { id });
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error updating order status: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         // GET: Orders/Delete/5

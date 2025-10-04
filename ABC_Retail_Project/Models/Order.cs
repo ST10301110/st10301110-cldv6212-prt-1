@@ -28,7 +28,58 @@ namespace ABC_Retail_Project.Models
         [Display(Name = "Order Date")]
         public DateTime OrderDate { get; set; }
 
-        public string Status { get; set; }
+        [Required(ErrorMessage = "Status is required")]
+        [Display(Name = "Order Status")]
+        public string Status { get; set; } = "Pending";
+
+        public bool CanUpdateStatus(string newStatus)
+        {
+            var validTransitions = new Dictionary<string, List<string>>
+            {
+                { "Pending", new List<string> { "Processing", "Cancelled" } },
+                { "Processing", new List<string> { "Shipped", "Cancelled" } },
+                { "Shipped", new List<string> { "Delivered", "Returned" } },
+                { "Delivered", new List<string> { "Completed", "Returned" } },
+                { "Cancelled", new List<string>() },
+                { "Completed", new List<string>() },
+                { "Returned", new List<string> { "Refunded" } },
+                { "Refunded", new List<string>() }
+            };
+
+            return validTransitions.ContainsKey(Status) &&
+                   validTransitions[Status].Contains(newStatus);
+        }
+
+        public static List<string> GetAllStatuses()
+        {
+            return new List<string>
+            {
+                "Pending",
+                "Processing",
+                "Shipped",
+                "Delivered",
+                "Completed",
+                "Cancelled",
+                "Returned",
+                "Refunded"
+            };
+        }
+
+        public string GetStatusBadgeClass()
+        {
+            return Status switch
+            {
+                "Pending" => "badge badge-warning",
+                "Processing" => "badge badge-info",
+                "Shipped" => "badge badge-primary",
+                "Delivered" => "badge badge-success",
+                "Completed" => "badge badge-success",
+                "Cancelled" => "badge badge-danger",
+                "Returned" => "badge badge-secondary",
+                "Refunded" => "badge badge-dark",
+                _ => "badge badge-light"
+            };
+        }
 
         public string PartitionKey { get; set; }
         public string RowKey { get; set; }
@@ -41,6 +92,7 @@ namespace ABC_Retail_Project.Models
         [IgnoreDataMember]
         public Product Product { get; set; }
 
+        // Display properties
         [Display(Name = "Customer Name")]
         public string CustomerName => Customer?.Name;
 

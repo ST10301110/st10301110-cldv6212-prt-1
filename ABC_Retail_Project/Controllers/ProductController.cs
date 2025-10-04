@@ -13,9 +13,28 @@ namespace ABC_Retail_Project.Controllers
         }
 
         // GET: Products
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string searchString)
         {
             var products = await _productService.GetProductsAsync();
+
+            // Apply search filter if provided
+            if (!string.IsNullOrEmpty(searchString))
+            {
+                searchString = searchString.ToLower();
+                products = products.Where(p =>
+                    p.Name.ToLower().Contains(searchString) ||
+                    p.Description.ToLower().Contains(searchString) ||
+                    p.Price.ToString().Contains(searchString)
+                ).ToList();
+
+                ViewBag.SearchString = searchString;
+                TempData["SearchMessage"] = $"Found {products.Count} product(s) matching '{searchString}'";
+            }
+            else
+            {
+                ViewBag.SearchString = "";
+            }
+
             return View(products);
         }
 
@@ -45,10 +64,23 @@ namespace ABC_Retail_Project.Controllers
                     product.RowKey = Guid.NewGuid().ToString();
                     product.PartitionKey = "Product";
 
-                    // Handle image upload if provided
+                    // Handle image upload if provided - USING FUNCTION FIRST
                     if (imageFile != null && imageFile.Length > 0)
                     {
-                        product.ImageUrl = await _productService.UploadImageAsync(imageFile, product.RowKey);
+                        // Try to upload via Function first
+                        var imageUrl = await _productService.UploadImageViaFunctionAsync(imageFile, product.RowKey);
+
+                        if (!string.IsNullOrEmpty(imageUrl))
+                        {
+                            product.ImageUrl = imageUrl;
+                            TempData["InfoMessage"] = "Image uploaded via Azure Function!";
+                        }
+                        else
+                        {
+                            // Fallback to direct upload if function fails
+                            product.ImageUrl = await _productService.UploadImageAsync(imageFile, product.RowKey);
+                            TempData["InfoMessage"] = "Image uploaded directly (Function unavailable)";
+                        }
                     }
                     else
                     {
@@ -113,13 +145,44 @@ namespace ABC_Retail_Project.Controllers
                 return NotFound();
             }
 
+            // Remove validation for fields that shouldn't be validated
+            ModelState.Remove("ImageUrl");
+            ModelState.Remove("PartitionKey");
+            ModelState.Remove("RowKey");
+            ModelState.Remove("Timestamp");
+            ModelState.Remove("ETag");
+
             if (ModelState.IsValid)
             {
                 try
                 {
+                    // Handle image upload if provided - USING FUNCTION FIRST
                     if (imageFile != null && imageFile.Length > 0)
                     {
-                        product.ImageUrl = await _productService.UploadImageAsync(imageFile, product.RowKey);
+                        // Try to upload via Function first
+                        var imageUrl = await _productService.UploadImageViaFunctionAsync(imageFile, product.RowKey);
+
+                        if (!string.IsNullOrEmpty(imageUrl))
+                        {
+                            product.ImageUrl = imageUrl;
+                            TempData["InfoMessage"] = "Image updated via Azure Function!";
+                        }
+                        else
+                        {
+                            // Fallback to direct upload if function fails
+                            product.ImageUrl = await _productService.UploadImageAsync(imageFile, product.RowKey);
+                            TempData["InfoMessage"] = "Image updated directly (Function unavailable)";
+                        }
+                    }
+                    // If no new image, keep the existing ImageUrl
+                    else if (string.IsNullOrEmpty(product.ImageUrl))
+                    {
+                        // Get the existing product to preserve the current image
+                        var existingProduct = await _productService.GetProductAsync("Product", id);
+                        if (existingProduct != null)
+                        {
+                            product.ImageUrl = existingProduct.ImageUrl;
+                        }
                     }
 
                     await _productService.UpdateProductAsync(product);
@@ -128,9 +191,22 @@ namespace ABC_Retail_Project.Controllers
                 }
                 catch (Exception ex)
                 {
-                    TempData["ErrorMessage"] = "Error updating product";
+                    Console.WriteLine($"Error updating product: {ex.Message}");
+                    TempData["ErrorMessage"] = "Error updating product. Please try again.";
                 }
             }
+            else
+            {
+                // Log validation errors for debugging
+                var errors = ModelState.Values.SelectMany(v => v.Errors);
+                foreach (var error in errors)
+                {
+                    Console.WriteLine($"Validation Error: {error.ErrorMessage}");
+                }
+
+                TempData["ErrorMessage"] = "Please fix the validation errors.";
+            }
+
             return View(product);
         }
 
@@ -157,7 +233,8 @@ namespace ABC_Retail_Project.Controllers
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = "Error deleting product";
+                Console.WriteLine($"Error deleting product: {ex.Message}");
+                TempData["ErrorMessage"] = "Error deleting product. Please try again.";
             }
             return RedirectToAction(nameof(Index));
         }
