@@ -1,7 +1,9 @@
-﻿using Azure;
+﻿using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Azure;
 using Azure.Data.Tables;
 using Azure.Storage.Queues;
-using System.Globalization;
 
 namespace ABC_Retail_Project.Models
 {
@@ -37,6 +39,18 @@ namespace ABC_Retail_Project.Models
 
             try
             {
+                // Validate order data
+                if (order == null)
+                {
+                    Console.WriteLine("ERROR: Order is null");
+                    throw new ArgumentNullException(nameof(order));
+                }
+
+                if (string.IsNullOrEmpty(order.PartitionKey) || string.IsNullOrEmpty(order.RowKey))
+                {
+                    Console.WriteLine("ERROR: PartitionKey or RowKey is null/empty");
+                    throw new ArgumentException("PartitionKey and RowKey are required");
+                }
 
                 var queueMessage = new OrderQueueMessage
                 {
@@ -45,12 +59,27 @@ namespace ABC_Retail_Project.Models
                     CustomerId = order.CustomerId,
                     ProductId = order.ProductId,
                     Quantity = order.Quantity,
-                    TotalAmount = (double)order.TotalAmount,
+                    TotalAmount = order.TotalAmount, // Now using decimal consistently
                     OrderDate = order.OrderDate,
                     Status = order.Status
                 };
 
-                var messageJson = System.Text.Json.JsonSerializer.Serialize(queueMessage);
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    Converters = { new DateTimeConverterUsingDateTimeParse() }
+                };
+
+                var messageJson = System.Text.Json.JsonSerializer.Serialize(queueMessage, options);
+                Console.WriteLine($"Serialized message: {messageJson}");
+
+                // Check queue client
+                if (_queueClient == null)
+                {
+                    Console.WriteLine("ERROR: QueueClient is null");
+                    throw new InvalidOperationException("QueueClient is not initialized");
+                }
+
                 await _queueClient.SendMessageAsync(messageJson);
 
                 Console.WriteLine("Order successfully added to queue! Function will process it.");
@@ -58,6 +87,7 @@ namespace ABC_Retail_Project.Models
             catch (Exception ex)
             {
                 Console.WriteLine($"ORDER QUEUE ERROR: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 throw;
             }
         }
@@ -69,9 +99,22 @@ namespace ABC_Retail_Project.Models
             public string CustomerId { get; set; }
             public string ProductId { get; set; }
             public int Quantity { get; set; }
-            public double TotalAmount { get; set; }
+            public decimal TotalAmount { get; set; } // Changed from double to decimal
             public DateTime OrderDate { get; set; }
             public string Status { get; set; }
+        }
+
+        public class DateTimeConverterUsingDateTimeParse : JsonConverter<DateTime>
+        {
+            public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                return DateTime.Parse(reader.GetString() ?? string.Empty);
+            }
+
+            public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+            {
+                writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+            }
         }
 
         private decimal GetTotalAmountFromEntity(TableEntity entity)
