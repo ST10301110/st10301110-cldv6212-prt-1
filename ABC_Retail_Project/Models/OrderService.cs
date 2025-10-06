@@ -59,7 +59,7 @@ namespace ABC_Retail_Project.Models
                     CustomerId = order.CustomerId,
                     ProductId = order.ProductId,
                     Quantity = order.Quantity,
-                    TotalAmount = order.TotalAmount, // Now using decimal consistently
+                    TotalAmount = order.TotalAmount,
                     OrderDate = order.OrderDate,
                     Status = order.Status
                 };
@@ -67,21 +67,20 @@ namespace ABC_Retail_Project.Models
                 var options = new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = false, // Ensure compact JSON
                     Converters = { new DateTimeConverterUsingDateTimeParse() }
                 };
 
                 var messageJson = System.Text.Json.JsonSerializer.Serialize(queueMessage, options);
                 Console.WriteLine($"Serialized message: {messageJson}");
 
-                // Check queue client
-                if (_queueClient == null)
+                // Validate JSON is properly formatted
+                if (string.IsNullOrEmpty(messageJson) || !messageJson.StartsWith('{') || !messageJson.EndsWith('}'))
                 {
-                    Console.WriteLine("ERROR: QueueClient is null");
-                    throw new InvalidOperationException("QueueClient is not initialized");
+                    throw new InvalidOperationException("Generated JSON is invalid");
                 }
 
                 await _queueClient.SendMessageAsync(messageJson);
-
                 Console.WriteLine("Order successfully added to queue! Function will process it.");
             }
             catch (Exception ex)
@@ -94,14 +93,14 @@ namespace ABC_Retail_Project.Models
 
         public class OrderQueueMessage
         {
-            public string PartitionKey { get; set; }
-            public string RowKey { get; set; }
-            public string CustomerId { get; set; }
-            public string ProductId { get; set; }
+            public string PartitionKey { get; set; } = string.Empty;
+            public string RowKey { get; set; } = string.Empty;
+            public string CustomerId { get; set; } = string.Empty;
+            public string ProductId { get; set; } = string.Empty;
             public int Quantity { get; set; }
-            public decimal TotalAmount { get; set; } // Changed from double to decimal
+            public decimal TotalAmount { get; set; }
             public DateTime OrderDate { get; set; }
-            public string Status { get; set; }
+            public string Status { get; set; } = "Pending";
         }
 
         public class DateTimeConverterUsingDateTimeParse : JsonConverter<DateTime>

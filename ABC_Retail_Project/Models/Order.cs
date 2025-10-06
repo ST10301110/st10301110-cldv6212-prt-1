@@ -92,16 +92,20 @@ namespace ABC_Retail_Project.Models
         [IgnoreDataMember]
         public Product Product { get; set; }
 
-        // Display properties
+        // Display properties - marked with IgnoreDataMember to prevent validation
+        [IgnoreDataMember]
         [Display(Name = "Customer Name")]
         public string CustomerName => Customer?.Name;
 
+        [IgnoreDataMember]
         [Display(Name = "Product Name")]
         public string ProductName => Product?.Name;
 
+        [IgnoreDataMember]
         [Display(Name = "Total Amount (R)")]
         public string FormattedTotalAmount => TotalAmount.ToString("C", new CultureInfo("en-ZA"));
 
+        [IgnoreDataMember]
         [Display(Name = "Order Date")]
         public string FormattedOrderDate => OrderDate.ToString("yyyy-MM-dd");
     }

@@ -69,13 +69,17 @@ namespace ABC_Retail_Project.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Order order)
         {
-            // Remove validation for fields that are set programmatically
+            // Remove validation for fields that are set programmatically or are computed
             ModelState.Remove("PartitionKey");
             ModelState.Remove("RowKey");
             ModelState.Remove("Timestamp");
             ModelState.Remove("ETag");
             ModelState.Remove("Customer");
             ModelState.Remove("Product");
+            ModelState.Remove("CustomerName");
+            ModelState.Remove("ProductName");
+            ModelState.Remove("FormattedTotalAmount");
+            ModelState.Remove("FormattedOrderDate");
 
             if (ModelState.IsValid)
             {
@@ -94,7 +98,7 @@ namespace ABC_Retail_Project.Controllers
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error creating order: {ex.Message}");
-                    TempData["ErrorMessage"] = "Error creating order. Please try again.";
+                    TempData["ErrorMessage"] = $"Error creating order: {ex.Message}";
                 }
             }
             else
@@ -140,6 +144,10 @@ namespace ABC_Retail_Project.Controllers
 
             ModelState.Remove("Customer");
             ModelState.Remove("Product");
+            ModelState.Remove("CustomerName");
+            ModelState.Remove("ProductName");
+            ModelState.Remove("FormattedTotalAmount");
+            ModelState.Remove("FormattedOrderDate");
 
             if (ModelState.IsValid)
             {
